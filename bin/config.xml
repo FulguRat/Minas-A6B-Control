@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<motions>
+    <motion pitch="3.0" roll="0.0" updown="0.0" elapsed="1000" />
+    <motion pitch="-3.0" roll="0.0" updown="0.0" elapsed="1000" />
+    <motion pitch="2.0" roll="0.0" updown="0.0" elapsed="1000" />
+    <motion pitch="-2.0" roll="0.0" updown="0.0" elapsed="1000" />
+    <motion pitch="1.0" roll="0.0" updown="0.0" elapsed="1000" />
+    <motion pitch="-1.0" roll="0.0" updown="0.0" elapsed="1000" />
+</motions>

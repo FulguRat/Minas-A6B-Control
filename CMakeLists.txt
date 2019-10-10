@@ -27,5 +27,6 @@ set(SOEM_LIB "${CMAKE_SOURCE_DIR}/lib/libsoem.a")
 set(OS_LIBS pthread rt)
 
 include_directories(${SOEM_INCLUDE_DIR})
+
 target_link_libraries(${PROJ_NAME} ${SOEM_LIB} ${OS_LIBS})
 message("SOEM Ready.")

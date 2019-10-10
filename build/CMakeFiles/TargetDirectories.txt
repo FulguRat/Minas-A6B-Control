@@ -1,0 +1,3 @@
+/home/fottistray/Desktop/Minas-A6B-Control/build/CMakeFiles/rebuild_cache.dir
+/home/fottistray/Desktop/Minas-A6B-Control/build/CMakeFiles/EtherCAT_Test.dir
+/home/fottistray/Desktop/Minas-A6B-Control/build/CMakeFiles/edit_cache.dir

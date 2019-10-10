@@ -21,6 +21,9 @@
 #ifndef MINAS_CLIENT_H
 #define MINAS_CLIENT_H
 
+//-- Unit command per millimeter
+#define UNIT_COMMAND_MM 0x19999a
+
 #include <osal.h>
 #include "ethercat_manager.h"
 
@@ -192,6 +195,12 @@ public:
    * \return void
    */
     void setProfileDeceleration(uint32_t val);
+
+    /*
+   * \brief Position Window setup [mm] 0 - 2 (6067 / 00h)
+   * \return void
+   */
+    void setPositionWindow(uint32_t val = 1);
 
     /*
    * \brief set Interpolation Time Period 250, 500, 1000, 2000, 4000 us

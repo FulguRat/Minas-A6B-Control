@@ -13,6 +13,12 @@ MinasApp::MinasApp(const string &_ifname) : ifname(_ifname),
 
         //-- motor not arrive
         vecArriveFlag.push_back(FALSE);
+
+        // motor velocity not arrive
+        mVelArriveFlag.push_back(FALSE);
+
+        // zero position as 0
+        mZeroPosition.push_back(0);
     }
 }
 
@@ -44,7 +50,7 @@ void MinasApp::minasInit(void)
 
         printMsgInput(clientNo);
 
-        vecInitialPos.push_back(vecInput[clientNo].position_actual_value);
+        //vecInitialPos.push_back(vecInput[clientNo].position_actual_value);
 
         //-- set target position
         minas_control::MinasOutput output;
@@ -52,7 +58,7 @@ void MinasApp::minasInit(void)
         vecOutput.push_back(output);
 
         //-- Position control
-        vecTargetPos.push_back(vecInitialPos[clientNo]);
+        vecTargetPos.push_back(vecInput[clientNo].position_actual_value);
     }
 
     cout << "=========>> [Leave minasInit]" << endl;
@@ -75,13 +81,17 @@ void MinasApp::minasFree(void)
         client->servoOff();
     }
 
+    //vecInitialPos.clear();
+
     cout << "=========>> [Leave minasFree]" << endl;
 }
 
 void MinasApp::minasConfig(MinasHandle _handle, uint32_t _pos, 
-                                                    uint32_t _vel, uint32_t _acc, uint32_t _dec)
+                                                    uint32_t _vel, uint32_t _acc, uint32_t _dec, uint16_t _toq)
 {
     cout << "=========>> [Enter minasConfig]" << endl;
+
+    cout << "    <<<<Begin   " << vecArriveFlag[0] << "  " << vecArriveFlag[1] << "  " << vecArriveFlag[2] << "  " << endl;
 
     minas_control::MinasClient *client = vecClient[_handle];
 
@@ -89,8 +99,8 @@ void MinasApp::minasConfig(MinasHandle _handle, uint32_t _pos,
     vecOutput[_handle].target_position = _pos;
     
     vecOutput[_handle].max_motor_speed = 1140;   // rad/min
-    vecOutput[_handle].target_torque = 5000;     // 0% (unit 0.1%)
-    vecOutput[_handle].max_torque = 5000;        // 50% (unit 0.1%)
+    vecOutput[_handle].target_torque = _toq;     // 0% (unit 0.1%)
+    vecOutput[_handle].max_torque = _toq;        // 50% (unit 0.1%)
     vecOutput[_handle].operation_mode = 0x01;   // position profile mode (pp)
     vecOutput[_handle].controlword = 0x001f;    // move to operation enabled + new set-point (bit4) + change set immediately (bit5)
     
@@ -103,6 +113,8 @@ void MinasApp::minasConfig(MinasHandle _handle, uint32_t _pos,
     //-- set profile deceleration
     client->setProfileDeceleration(_dec);
 
+    client->setPositionWindow(3);
+
     //-- pp control model setup
     //-- see controlword(6040.h) p.107 & statusword(6041.h) p.113
     client->writeOutputs(vecOutput[_handle]);
@@ -114,20 +126,32 @@ void MinasApp::minasConfig(MinasHandle _handle, uint32_t _pos,
     printMsgInput(_handle);
 
     vecOutput[_handle].controlword &= ~0x0010; // clear new set-point (bit4)
+
+    clock_t start = clock();
+
     client->writeOutputs(vecOutput[_handle]);
-    while (vecInput[_handle].statusword & 0x0400)
+    while (vecInput[_handle].statusword & 0x0400) // bit10 Target Reached
     {
-        vecInput[_handle] = client->readInputs(); // bit12 (set-point acknowledge)
+        vecInput[_handle] = client->readInputs();
+
+        if(double(clock() - start) / CLOCKS_PER_SEC >= 1e-2){
+            vecArriveFlag[_handle] = TRUE;
+            cout << "Target position has Arrived: "<< hex << vecOutput[_handle].target_position << endl;
+            cout << "=========>> [Leave minasConfig]" << endl;
+            return;
+        } 
     }
 
     printMsgInput(_handle);
 
     cout << "Target position has been changed to: "<< hex << vecOutput[_handle].target_position << endl;
 
+    cout << "    <<<<End   " << vecArriveFlag[0] << "  " << vecArriveFlag[1] << "  " << vecArriveFlag[2] << "  " << endl;
+
     cout << "=========>> [Leave minasConfig]" << endl;
 }
 
-void MinasApp::minasUnitCtrl(MinasHandle _handle, double _round, uint32_t _cycle)
+void MinasApp::minasUnitCtrl(MinasHandle _handle, uint32_t _cycle)
 {
     minas_control::MinasClient *client = vecClient[_handle];
     vecInput[_handle] = client->readInputs();
@@ -143,10 +167,10 @@ void MinasApp::minasUnitCtrl(MinasHandle _handle, double _round, uint32_t _cycle
         //-- see statusword (6041h) p.102
         if (vecInput[_handle].statusword & 0x0400)
         {
-            vecInitialPos[_handle] = vecInput[_handle].position_actual_value;
+            // vecInitialPos[_handle] = vecInput[_handle].position_actual_value;
 
             //-- target reached (bit 10)
-            cout << "Target reached, current position is: " << hex << vecInitialPos[_handle] << endl;
+            cout << "TODO::Target reached, current position is: " << hex << vecInput[_handle].position_actual_value << endl;
 
             vecArriveFlag[_handle] = TRUE;
 
@@ -157,24 +181,84 @@ void MinasApp::minasUnitCtrl(MinasHandle _handle, double _round, uint32_t _cycle
     client->writeOutputs(vecOutput[_handle]);
 }
 
-void MinasApp::minasCtrl(double _round)
+void MinasApp::minasInitCtrl(){
+    cout << "=========>> [Enter minasInitCtrl]" << endl;
+
+    const double _mm = -(CylinderLength+10);
+    for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++){
+        cout << "  <<<  client no.  " << dec << (uint32_t)clientNo << endl;
+        minas_control::MinasClient *client = vecClient[clientNo];
+
+        vecInput[clientNo] = client->readInputs();
+        // vecInitialPos[clientNo] = vecInput[clientNo].position_actual_value;
+
+        // cout << "  <<<  initial position   " << vecInitialPos[clientNo] << endl;
+
+        vecTargetPos[clientNo] = /*vecInitialPos[clientNo]*/vecInput[clientNo].position_actual_value + UNIT_COMMAND_MM * _mm;
+
+        //-- config new action
+        minasConfig(clientNo, vecTargetPos[clientNo], 0x2faf080, 0x80000000, 0x80000000, 500);
+    }
+    
+    //-- initialize time stamp
+    timeStamp.timeStampInit();
+    timeStamp.timeStampSync();
+    timespec start_time = timeStamp.GetRealTime();
+
+    for (uint32_t cycle = 0;; cycle++){
+        //-- for several clients
+        for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++){
+
+            if(!mVelArriveFlag[clientNo])
+                minasUnitCtrl(hMinas[clientNo], cycle);
+
+            if(timeStamp.GetRealTime().tv_sec - start_time.tv_sec >= 1)
+            {
+                if(mVelArriveFlag[clientNo])
+                    continue;
+                if(vecInput[clientNo].velocity_actual_value < 0x10000 || 
+                    vecInput[clientNo].velocity_actual_value > 0xffff0000)
+                {
+                    mVelArriveFlag[clientNo] = TRUE;
+                }
+            }
+        }
+
+        timeStamp.timeStampSync();
+
+        bool allArriveFlag = TRUE;
+        for (uint8_t clientNo = 0; clientNo < mVelArriveFlag.size(); clientNo++)
+            allArriveFlag &= mVelArriveFlag[clientNo];
+
+        if (allArriveFlag == TRUE){
+            for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++){
+                mVelArriveFlag[clientNo] = FALSE;
+            }
+            break;
+        }
+    }
+
+    cout << "=========>> [Leave minasInitCtrl]" << endl;
+}
+
+void MinasApp::minasCtrl(vector<double> _mms)
 {
     cout << "=========>> [Enter minasCtrl]" << endl;
 
     for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++)
     {
-        cout << "  <<<  client no.  " << dec << clientNo << endl;
+        cout << "  <<<  client no.  " << dec << (uint32_t)clientNo << endl;
         minas_control::MinasClient *client = vecClient[clientNo];
 
         vecInput[clientNo] = client->readInputs();
-        vecInitialPos[clientNo] = vecInput[clientNo].position_actual_value;
+        // vecInitialPos[clientNo] = vecInput[clientNo].position_actual_value;
 
-        cout << "  <<<  initial position   " << vecInitialPos[clientNo] << endl;
+        // cout << "  <<<  initial position   " << vecInitialPos[clientNo] << endl;
 
-        vecTargetPos[clientNo] = vecInitialPos[clientNo] + 0x800000 * _round;
+        vecTargetPos[clientNo] = /*vecInitialPos[clientNo]*/ + UNIT_COMMAND_MM * (_mms[clientNo] + mZeroPosition[clientNo]);
 
         //-- config new action
-        minasConfig(clientNo, vecTargetPos[clientNo], 0x16000000, 0x80000000, 0x80000000);
+        minasConfig(clientNo, vecTargetPos[clientNo], 0x5000000, 0x80000000, 0x80000000, 1000);
     }
     
     //-- initialize time stamp
@@ -182,10 +266,13 @@ void MinasApp::minasCtrl(double _round)
 
     for (uint32_t cycle = 0;; cycle++)
     {
+        
+
         //-- for several clients
         for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++)
         {
-            minasUnitCtrl(hMinas[clientNo], _round, cycle);
+            if(!vecArriveFlag[clientNo])
+                minasUnitCtrl(hMinas[clientNo], cycle);
         }
 
         timeStamp.timeStampSync();
@@ -212,7 +299,7 @@ void MinasApp::minasCtrl(double _round)
 
 void MinasApp::printMsg(MinasHandle _handle, uint32_t _cycle)
 {
-    printf("\n\n\n");
+    cout<<endl<<endl<<endl;
     printf("Period   %d\n", _cycle);
     timeStamp.printMsg();
     printMsgInput(_handle);
@@ -245,4 +332,35 @@ void MinasApp::printMsgOutput(MinasHandle _handle)
         printf("   60B8h %08x :Touch Probe function\n", vecOutput[_handle].touch_probe_function);
         printf("   60FFh %08x :Target Velocity\n", vecOutput[_handle].target_velocity);
         printf("   60B0h %08x :Position Offset\n", vecOutput[_handle].position_offset);
+}
+
+void MinasApp::SetZeroPosition(){
+    cout << "=========>> [Enter SetZeroPosition]" << endl;
+
+    for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++){
+        cout << "  <<<  client no.  " << dec << (uint32_t)clientNo << endl;
+        minas_control::MinasClient *client = vecClient[clientNo];
+
+        vecInput[clientNo] = client->readInputs();
+
+        if(vecInput[clientNo].position_actual_value & 0x80000000){
+            cout << "<0   "<< hex << vecInput[clientNo].position_actual_value  << endl;
+            cout << "<0   "<< hex << (~vecInput[clientNo].position_actual_value) + 0x00000001  << endl;
+            cout << "<0   " << dec << -static_cast<double>(~vecInput[clientNo].position_actual_value + 0x00000001) <<endl;
+
+
+            mZeroPosition[clientNo] = -static_cast<double>(~vecInput[clientNo].position_actual_value + 0x00000001) / UNIT_COMMAND_MM;
+            cout << "<0   "<< mZeroPosition[clientNo]  << endl;
+        }
+        else{
+            mZeroPosition[clientNo] = static_cast<double>(vecInput[clientNo].position_actual_value) / UNIT_COMMAND_MM;
+            cout << ">0   "<< mZeroPosition[clientNo]  << endl;
+        }        
+    }
+
+    for(int i=0;i<mZeroPosition.size();++i){
+        cout<<"zero position of "<<i<<" is "<<mZeroPosition[i]<<endl;
+    }
+
+    cout << "=========>> [Leave SetZeroPosition]" << endl;
 }

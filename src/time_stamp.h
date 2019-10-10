@@ -24,6 +24,10 @@ public:
     void timeStampInc(const int &_nsec);
 
     void printMsg(void);
+    
+    timespec GetRealTime(){
+        return realTime;
+    }
 
 private:
     //-- standard time stamp and real time

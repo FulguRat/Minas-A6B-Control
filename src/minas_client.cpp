@@ -528,6 +528,12 @@ void MinasClient::setProfileDeceleration(uint32_t val)
     manager_.writeSDO<uint32_t>(slave_no_, 0x6084, 0x00, u32val);
 }
 
+void MinasClient::setPositionWindow(uint32_t val){
+    // 6067h, unit: mm, range: 0 - 2, U32
+    uint32_t u32val = (uint32_t)val * UNIT_COMMAND_MM;
+    manager_.writeSDO<uint32_t>(slave_no_, 0x6067, 0x00, u32val);
+}
+
 void MinasClient::setInterpolationTimePeriod(int us)
 {
     uint32_t u32val;
