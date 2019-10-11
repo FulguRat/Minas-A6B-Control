@@ -1,7 +1,7 @@
 #include "motion.h"
 
 // 单位 mm
-#define CYLINDER_HEIGHT 476.0 + 9
+#define CYLINDER_HEIGHT 485.0 // 476.0 + 9
 #define MAX_CYLINDER_LENGTH 44.0 // 总行程的一半
 #define FB_LENGTH 433.5 // 433.6 这两个长度要相等，否则下面方程需要改
 #define LR_LENGTH 433.5 // 433.3 -> 433.5

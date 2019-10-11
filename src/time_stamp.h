@@ -29,6 +29,12 @@ public:
         return realTime;
     }
 
+    // unit: ms; has 10ms bias
+    double operator-(const timespec& t2){
+        return ((realTime.tv_sec + double(realTime.tv_nsec) / NSEC_PER_SECOND) - 
+                        (t2.tv_sec + double(t2.tv_nsec) / NSEC_PER_SECOND)) * 1e3;
+    }
+
 private:
     //-- standard time stamp and real time
     timespec tick;

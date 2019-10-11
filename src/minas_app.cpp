@@ -212,7 +212,7 @@ void MinasApp::minasInitCtrl(){
             if(!mVelArriveFlag[clientNo])
                 minasUnitCtrl(hMinas[clientNo], cycle);
 
-            if(timeStamp.GetRealTime().tv_sec - start_time.tv_sec >= 1)
+            if(timeStamp - start_time >= 1e3)
             {
                 if(mVelArriveFlag[clientNo])
                     continue;
@@ -241,7 +241,7 @@ void MinasApp::minasInitCtrl(){
     cout << "=========>> [Leave minasInitCtrl]" << endl;
 }
 
-void MinasApp::minasCtrl(vector<double> _mms)
+void MinasApp::minasCtrl(vector<double> _mms, double elapsed)
 {
     cout << "=========>> [Enter minasCtrl]" << endl;
 
@@ -258,11 +258,13 @@ void MinasApp::minasCtrl(vector<double> _mms)
         vecTargetPos[clientNo] = /*vecInitialPos[clientNo]*/ + UNIT_COMMAND_MM * (_mms[clientNo] + mZeroPosition[clientNo]);
 
         //-- config new action
-        minasConfig(clientNo, vecTargetPos[clientNo], 0x5000000, 0x80000000, 0x80000000, 1000);
+        minasConfig(clientNo, vecTargetPos[clientNo], 0x5000000, 0x80000000, 0x80000000, 2000);
     }
     
     //-- initialize time stamp
     timeStamp.timeStampInit();
+    timeStamp.timeStampSync();
+    timespec start = timeStamp.GetRealTime();
 
     for (uint32_t cycle = 0;; cycle++)
     {
@@ -283,8 +285,13 @@ void MinasApp::minasCtrl(vector<double> _mms)
             allArriveFlag &= vecArriveFlag[clientNo];
         }
         
-        if (allArriveFlag == TRUE)
+        // (timeStamp - start) unit:ms
+        if (allArriveFlag == TRUE || (timeStamp - start) > elapsed)
         {
+            if((timeStamp - start) > elapsed){
+                cout << "-----------used time: " << (timeStamp - start) << " elapsed: " << elapsed << endl;
+            }
+
             for (uint8_t clientNo = 0; clientNo < hMinas.size(); clientNo++)
             {
                 vecArriveFlag[clientNo] = FALSE;

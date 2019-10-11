@@ -37,7 +37,7 @@ public:
     void minasUnitCtrl(MinasHandle _handle, uint32_t _cycle);
 
     void minasInitCtrl();
-    void minasCtrl(vector<double> _mms);
+    void minasCtrl(vector<double> _mms, double elapsed);
 
     void printMsg(MinasHandle _handle, uint32_t _cycle);
     void printMsgInput(MinasHandle _handle);
